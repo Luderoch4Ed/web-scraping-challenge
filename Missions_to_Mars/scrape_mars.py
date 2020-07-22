@@ -2,18 +2,19 @@ from splinter import Browser
 from bs4 import BeautifulSoup
 import pandas as pd
 import datetime as dt
+import time
 
 
 def scrape():
     executable_path = {'executable_path': 'chromedriver.exe'}
-    browser = Browser('chrome', **executable_path, headless=False)
+    browser = Browser('chrome', **executable_path, headless=True)
 
-    news_title, news_par = mars_news(browser)
+    news_title, news_text = mars_news(browser)
 
     # Run all scraping functions and store in dictionary.
     data = {
         "news_title": news_title,
-        "news_paragraph": news_par,
+        "news_paragraph": news_text,
         "featured_image": featured_image(browser),
         "hemispheres": hemispheres(browser),
         "weather": weather(browser),
@@ -30,48 +31,52 @@ def mars_news(browser):
     # NASA Mars News Site
     nasamars_url = ('https://mars.nasa.gov/news/')
     browser.visit(nasamars_url)
-    
-    html_nasa = browser.html
-    #soup_news = BeautifulSoup(html_nasa, 'html.parser')
-    soup = BeautifulSoup(html, 'html.parser')
-    #NASA news most current stories
-    nasa_news = soup.select_one('ul.item_list li.slide')
-    news_title = nasa_news.find("div", class_='content_title').get_text()
-    news_par = nasa_news.find("div", class_='article_teaser_body').get_text()
-    
-    # get the news title
-    #news_title = soup.find('div', class_='bottom_gradient').text
-    # get the paragraph text
-    #news_par = soup.find('div', class_='article_teaser_body').text
+    # time.sleep(2)
+    html = browser.html
+    #soup = BeautifulSoup(html, 'html.parser')
+    # soup = BeautifulSoup(html, 'lxml')
 
-    return news_title, news_par
-
+    
+    nasa_news = browser.find_by_css("ul.item_list li.slide").first
+    # print("Title: ",nasa_news.find_by_css("div.content_title").text)
+    # print("Body: ",nasa_news.find_by_css("div.article_teaser_body").text)
+    news_title = nasa_news.find_by_css("div.content_title").text
+    news_text = nasa_news.find_by_css("div.article_teaser_body").text
+    #news_title = nasa_news.find("div", class_='content_title').get_text()
+    #news_text = nasa_news.find("div", class_='article_teaser_body').get_text()
+    # news_title = soup.find('div', class_='bottom_gradient').text
+  
+    # Get news text 
+    # news_text = soup.find('div', class_='article_teaser_body').text
+    
+    return news_title, news_text
 
 def featured_image(browser):
     browser.visit('https://www.jpl.nasa.gov/spaceimages/?search=&category=Mars')
 
-    # find full image and click on it
+    # locate full image and click on it
     full_image = browser.find_by_id("full_image")
     full_image.click()
 
-    # find 'more info' and click on it
+    # locate 'more info' and click on it
     browser.is_element_present_by_text("more info", wait_time=1)
     more_info= browser.find_link_by_partial_text("more info")
     more_info.click()
 
-    # parse the html
+    # parse the html using BeautifulSoup
     img_bs= BeautifulSoup(browser.html, "html.parser")
 
     image_url = img_bs.select_one('figure.lede a img').get("src")
 
-    # concatenate to get the full url 
+    # build complete url 
     featured_image_url = 'https://www.jpl.nasa.gov' + image_url
+
     return featured_image_url
    
 
 
-def hemispheres(browser):
-    browser.visit("https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars")
+def hemispheres(brovwser):
+    browser.visit("https://astrogeology.usgs.go/search/results?q=hemisphere+enhanced&k1=target&v1=Mars")
 
     # Click the link, find the sample anchor, return the href
     hemisphere_image_urls = []
@@ -85,21 +90,20 @@ def hemispheres(browser):
         # Append hemisphere object to list
         hemisphere_image_urls.append(hemi_data)
 
-        # Finally, we navigate backwards
+        # Return to prior location
         browser.back()
 
     return hemisphere_image_urls
 
-
+ 
 def weather(browser):
     browser.visit('https://twitter.com/marswxreport?lang=en')
-
-    html = browser.html
-    soup = BeautifulSoup(browser.html, 'html.parser')
+    return browser.find_by_css("Article div[lang='en']").first.text
+    #mars_weather = [ tw.text  for tw in browser.find_by_css("Article div[lang='en']") ]
 
     # get the most current tweet data
-    mars_weather = soup.find('div', attrs={"class":"css-901oao r-hkyrab r-1qd0xha r-a023e6 r-16dba41 r-ad9z0x r-bcqeeo r-bnwqim r-qvutc0"})
-    return mars_weather
+  
+    #return mars_weather[0]
 
 
 def scrape_hemisphere(html_text):
@@ -127,16 +131,14 @@ def scrape_hemisphere(html_text):
 
 
 def facts():
-    try:
-        mars_data_df = pd.read_html('https://space-facts.com/mars/')[0]
-    except BaseException:
-        return None
-
-    mars_data_df.columns = ['Description', 'Value']
-    mars_data_df.set_index('Description', inplace=True)
-
-    # Add some bootstrap styling to <table>
-    return mars_data_df.to_html()
+    tables = pd.read_html('http://space-facts.com/mars/')
+    table_df = tables[0]
+    table_df.columns = ['Parameter','Mars']
+    table_df.to_html('mars_facts.html', index=False)
+    table_df.set_index('Parameter')
+    mars_facts = table_df.to_html(classes="table table-striped")
+    
+    return mars_facts
 
 
 if __name__ == "__main__":

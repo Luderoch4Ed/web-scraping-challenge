@@ -17,11 +17,11 @@ def index():
 def scrape():
     mars_db = mongo.mars_info
     # Run the scrape function
-    mars_info = scrape_mars.scrape()
+    mars_data = scrape_mars.scrape()
 
     # Refresh data in Mongo db using update and upsert=True
     # mongo.db.collection.update({}, mars_data, upsert=True)
-    mars_db.update({}, mars_info, upsert=True)
+    mars_db.update({}, mars_data, upsert=True)
     return "Data update complete."
     
 if __name__== "__main__":
